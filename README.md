@@ -217,13 +217,13 @@ The `scripts/test_*.py` files are additional manual checks; some require local p
 With Docker installed and running:
 
 ```bash
-docker build -f dockerfile -t telco-churn:local .
+docker build -f Dockerfile -t telco-churn:local .
 docker run --rm -p 8000:8000 telco-churn:local
 ```
 
-The [Dockerfile](dockerfile) packages the bundled run `3b1a41221fc44548aed629fa42b762e0` and copies its model and feature schema into `/app/model`. It does not automatically package your latest local training run. To serve a different run in the image, select and package that run's model and matching metadata together.
+The [Dockerfile](Dockerfile) packages the bundled run `3b1a41221fc44548aed629fa42b762e0` and copies its model and feature schema into `/app/model`. It does not automatically package your latest local training run. To serve a different run in the image, select and package that run's model and matching metadata together.
 
-The [GitHub Actions workflow](.github/workflows/ci.yml), when enabled, runs on pushes to `main`, builds the image, and publishes it to Docker Hub. Its current destination is `anasriad8/telco-fastapi:latest`, inherited from the original project. Publishing under another account requires changing that destination and configuring `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` in repository Actions secrets.
+The [GitHub Actions workflow](.github/workflows/ci.yml), when enabled, runs on pushes to `main`, builds the image, and publishes it to Docker Hub. Its destination is `anastzel/telco-fastapi:latest`. Publishing requires configuring `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` in repository Actions secrets with credentials that have push access to that Docker Hub repository.
 
 The workflow currently has no test stage, container startup check, or automated AWS deployment. An ECS/Fargate deployment behind an Application Load Balancer is a possible extension; infrastructure provisioning and deployment automation are not included here.
 
@@ -257,7 +257,7 @@ src/
   app/main.py                FastAPI application and mounted Gradio UI
 tests/                       Validation and web-stack regression tests
 requirements.txt             Dependency pins for the Python 3.11 baseline
-dockerfile                   Container build definition
+Dockerfile                   Container build definition
 ```
 
 ## Project provenance
