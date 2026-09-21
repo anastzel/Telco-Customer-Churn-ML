@@ -11,7 +11,7 @@ from data.preprocess import preprocess_data
 from features.build_features import build_features
 
 # === CONFIG ===
-DATA_PATH = "/Users/riadanas/Desktop/Telco Customer Churn MLE/data/raw/Telco-Customer-Churn.csv"  # adjust to your file path
+DATA_PATH = "/Users/anastzel/PROJECTS/Telco-Customer-Churn-ML/data/raw/Telco-Customer-Churn.csv"  # adjust to your file path
 TARGET_COL = "Churn"
 
 def main():
