@@ -1,52 +1,51 @@
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
+"""Optional Optuna experiment with a held-out final test set."""
+
+import sys
+from pathlib import Path
+
 import optuna
+import pandas as pd
+from sklearn.metrics import precision_score, recall_score, roc_auc_score
+from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 
-print("=== Phase 2: Modeling with XGBoost ===")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src.features.pipeline import INPUT_COLUMNS, make_pipeline
 
-df = pd.read_csv("data/processed/telco_churn_processed.csv")
 
-# target must be numeric 0/1
-if df["Churn"].dtype == "object":
-    df["Churn"] = df["Churn"].str.strip().map({"No": 0, "Yes": 1})
+def main() -> None:
+    raw = pd.read_csv(Path("data/raw/Telco-Customer-Churn.csv"))
+    X = raw.loc[:, INPUT_COLUMNS]
+    y = raw["Churn"].map({"No": 0, "Yes": 1})
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=42
+    )
+    weight = float((y_train == 0).sum() / (y_train == 1).sum())
+    cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
 
-assert df["Churn"].isna().sum() == 0, "Churn has NaNs"
-assert set(df["Churn"].unique()) <= {0, 1}, "Churn not 0/1"
+    def objective(trial: optuna.Trial) -> float:
+        pipeline = make_pipeline(weight)
+        pipeline.named_steps["model"].set_params(
+            n_estimators=trial.suggest_int("n_estimators", 100, 500),
+            learning_rate=trial.suggest_float("learning_rate", 0.01, 0.2, log=True),
+            max_depth=trial.suggest_int("max_depth", 3, 8),
+        )
+        return float(cross_val_score(
+            pipeline, X_train, y_train, cv=cv, scoring="roc_auc", n_jobs=1
+        ).mean())
 
-X = df.drop(columns=["Churn"])
-y = df["Churn"]
+    study = optuna.create_study(direction="maximize")
+    study.optimize(objective, n_trials=30)
+    best = make_pipeline(weight)
+    best.named_steps["model"].set_params(**study.best_params)
+    best.fit(X_train, y_train)
+    probabilities = best.predict_proba(X_test)[:, 1]
+    predictions = (probabilities >= 0.35).astype(int)
+    print("Best cross-validation ROC AUC:", study.best_value)
+    print("Untouched test ROC AUC:", roc_auc_score(y_test, probabilities))
+    print("Untouched test recall:", recall_score(y_test, predictions))
+    print("Untouched test precision:", precision_score(y_test, predictions))
+    print("Best parameters:", study.best_params)
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, stratify=y, random_state=42
-)
 
-THRESHOLD = 0.4
-
-def objective(trial):
-    params = {
-        "n_estimators": trial.suggest_int("n_estimators", 300, 800),
-        "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.2),
-        "max_depth": trial.suggest_int("max_depth", 3, 10),
-        "subsample": trial.suggest_float("subsample", 0.5, 1.0),
-        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
-        "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
-        "gamma": trial.suggest_float("gamma", 0, 5),
-        "reg_alpha": trial.suggest_float("reg_alpha", 0, 5),
-        "reg_lambda": trial.suggest_float("reg_lambda", 0, 5),
-        "random_state": 42,
-        "n_jobs": -1,
-        "scale_pos_weight": (y_train == 0).sum() / (y_train == 1).sum(),
-        "eval_metric": "logloss",
-    }
-    model = XGBClassifier(**params)
-    model.fit(X_train, y_train)
-    proba = model.predict_proba(X_test)[:, 1]
-    y_pred = (proba >= THRESHOLD).astype(int)
-    from sklearn.metrics import recall_score
-    return recall_score(y_test, y_pred, pos_label=1)
-
-study = optuna.create_study(direction="maximize")
-study.optimize(objective, n_trials=30)
-print("Best Params:", study.best_params)
-print("Best Recall:", study.best_value)
+if __name__ == "__main__":
+    main()

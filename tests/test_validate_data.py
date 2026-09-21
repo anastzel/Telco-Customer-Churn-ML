@@ -1,18 +1,22 @@
-from pathlib import Path
-
 import pandas as pd
 import pytest
 
+from src.features.pipeline import CATEGORY_OPTIONS
 from src.utils.validate_data import validate_telco_data
 
 
 @pytest.fixture
 def raw_data():
-    path = Path(__file__).resolve().parents[1] / "data/raw/Telco-Customer-Churn.csv"
-    return pd.read_csv(path)
+    data = {column: [options[0], options[-1]] for column, options in CATEGORY_OPTIONS.items()}
+    data.update({
+        "customerID": ["1", "2"], "Churn": ["Yes", "No"],
+        "SeniorCitizen": [0, 1], "tenure": [12, 0],
+        "MonthlyCharges": [50.0, 0.0], "TotalCharges": ["600", " "],
+    })
+    return pd.DataFrame(data)
 
 
-def test_raw_csv_passes_without_mutation(raw_data):
+def test_valid_data_passes_without_mutation(raw_data):
     original = raw_data.copy(deep=True)
     assert validate_telco_data(raw_data) == (True, [])
     pd.testing.assert_frame_equal(raw_data, original)

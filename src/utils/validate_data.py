@@ -1,9 +1,10 @@
 import great_expectations as ge
 import pandas as pd
-from typing import Tuple, List
+
+from src.features.pipeline import CATEGORY_OPTIONS, INPUT_COLUMNS
 
 
-def validate_telco_data(df) -> Tuple[bool, List[str]]:
+def validate_telco_data(df) -> tuple[bool, list[str]]:
     """
     Comprehensive data validation for Telco Customer Churn dataset using Great Expectations.
     
@@ -36,58 +37,29 @@ def validate_telco_data(df) -> Tuple[bool, List[str]]:
     )
     expectations = []
 
-    # === SCHEMA VALIDATION - ESSENTIAL COLUMNS ===
-    print("   📋 Validating schema and required columns...")
-    
-    # Customer identifier must exist (required for business operations)  
-    expectations.append(ge.expectations.ExpectColumnToExist(column="customerID"))
+    # Validate the complete model input schema before splitting or fitting.
+    print("   📋 Validating schema and categories...")
+    for column in ["customerID", "Churn", *INPUT_COLUMNS]:
+        expectations.append(ge.expectations.ExpectColumnToExist(column=column))
     expectations.append(ge.expectations.ExpectColumnValuesToNotBeNull(column="customerID"))
-    
-    # Core demographic features
-    expectations.append(ge.expectations.ExpectColumnToExist(column="gender"))
-    expectations.append(ge.expectations.ExpectColumnToExist(column="Partner"))
-    expectations.append(ge.expectations.ExpectColumnToExist(column="Dependents"))
-    
-    # Service features (critical for churn analysis)
-    expectations.append(ge.expectations.ExpectColumnToExist(column="PhoneService"))
-    expectations.append(ge.expectations.ExpectColumnToExist(column="InternetService"))
-    expectations.append(ge.expectations.ExpectColumnToExist(column="Contract"))
-    
-    # Financial features (key churn predictors)
-    expectations.append(ge.expectations.ExpectColumnToExist(column="tenure"))
-    expectations.append(ge.expectations.ExpectColumnToExist(column="MonthlyCharges"))
-    expectations.append(ge.expectations.ExpectColumnToExist(column="TotalCharges"))
-    
-    # === BUSINESS LOGIC VALIDATION ===
-    print("   💼 Validating business logic constraints...")
-    
-    # Gender must be one of expected values (data integrity)
-    expectations.append(ge.expectations.ExpectColumnValuesToBeInSet(column="gender", value_set=["Male", "Female"]))
-    
-    # Yes/No fields must have valid values
-    expectations.append(ge.expectations.ExpectColumnValuesToBeInSet(column="Partner", value_set=["Yes", "No"]))
-    expectations.append(ge.expectations.ExpectColumnValuesToBeInSet(column="Dependents", value_set=["Yes", "No"]))
-    expectations.append(ge.expectations.ExpectColumnValuesToBeInSet(column="PhoneService", value_set=["Yes", "No"]))
-    
-    # Contract types must be valid (business constraint)
     expectations.append(ge.expectations.ExpectColumnValuesToBeInSet(
-        column="Contract",
-        value_set=["Month-to-month", "One year", "Two year"]
+        column="Churn", value_set=["Yes", "No"]
     ))
-    
-    # Internet service types (business constraint)
+    for column, options in CATEGORY_OPTIONS.items():
+        expectations.append(ge.expectations.ExpectColumnValuesToBeInSet(
+            column=column, value_set=options
+        ))
     expectations.append(ge.expectations.ExpectColumnValuesToBeInSet(
-        column="InternetService",
-        value_set=["DSL", "Fiber optic", "No"]
+        column="SeniorCitizen", value_set=[0, 1]
     ))
-    
+
     # === NUMERIC RANGE VALIDATION ===
     print("   📊 Validating numeric ranges and business constraints...")
     
     # Tenure must be non-negative (business logic - can't have negative tenure)
     expectations.append(ge.expectations.ExpectColumnValuesToBeBetween(column="tenure", min_value=0))
     
-    # Monthly charges must be positive (business logic - no free service)
+    # Monthly charges must be non-negative.
     expectations.append(ge.expectations.ExpectColumnValuesToBeBetween(column="MonthlyCharges", min_value=0))
     
     # Total charges should be non-negative (business logic)

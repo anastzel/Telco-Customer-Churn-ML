@@ -5,6 +5,8 @@ env/
 
 # OS cruft
 .DS_Store
+.vscode/
+.gradio/
 
 # Python cache
 __pycache__/
